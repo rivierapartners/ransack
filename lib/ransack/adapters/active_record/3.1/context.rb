@@ -67,10 +67,10 @@ module Ransack
           table   = attr.arel_attribute.relation.table_name
 
           unless @engine.connection_pool.table_exists?(table)
-            raise "No table named #{table} exists"
+            :integer
+          else
+            @engine.connection_pool.columns_hash[table][name].type
           end
-
-          @engine.connection_pool.columns_hash[table][name].type
         end
 
         private
