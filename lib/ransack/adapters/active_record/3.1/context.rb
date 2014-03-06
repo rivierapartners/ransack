@@ -67,7 +67,19 @@ module Ransack
           table   = attr.arel_attribute.relation.table_name
 
           unless @engine.connection_pool.table_exists?(table)
-            :integer
+            prefix = name[0,2]
+            case prefix
+            when 'bo'
+              :boolean
+            when 'in'
+              :integer
+            when 'fl'
+              :float
+            when 'da'
+              :datetime
+            else
+              :integer
+            end
           else
             @engine.connection_pool.columns_hash[table][name].type
           end
