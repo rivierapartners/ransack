@@ -77,6 +77,8 @@ module Ransack
               :float
             when 'da'
               :datetime
+            when 'st'
+            	:string
             else
               :integer
             end
