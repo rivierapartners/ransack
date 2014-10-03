@@ -2,7 +2,7 @@ require 'ransack/visitor'
 
 module Ransack
   class Context
-    attr_reader :search, :object, :klass, :base, :engine, :arel_visitor
+    attr_reader :object, :klass, :base, :engine, :arel_visitor
     attr_accessor :auth_object, :search_key
 
     class << self
@@ -34,10 +34,17 @@ module Ransack
       @object = relation_for(object)
       @klass = @object.klass
       @join_dependency = join_dependency(@object)
-      @join_type = options[:join_type] || Arel::OuterJoin
+      @join_type = options[:join_type] || Polyamorous::OuterJoin
       @search_key = options[:search_key] || Ransack.options[:search_key]
-      @base = @join_dependency.join_base
-      @engine = @base.arel_engine
+
+      if ::ActiveRecord::VERSION::STRING >= "4.1"
+        @base = @join_dependency.join_root
+        @engine = @base.base_klass.arel_engine
+      else
+        @base = @join_dependency.join_base
+        @engine = @base.arel_engine
+      end
+
       @default_table = Arel::Table.new(
         @base.table_name, :as => @base.aliased_table_name, :engine => @engine
         )
@@ -59,7 +66,7 @@ module Ransack
       elsif obj.respond_to? :base_klass     # Rails 4
         obj.base_klass
       else
-        raise ArgumentError, "Don't know how to klassify #{obj}"
+        raise ArgumentError, "Don't know how to klassify #{obj.inspect}"
       end
     end
 
@@ -68,6 +75,19 @@ module Ransack
     def contextualize(str)
       parent, attr_name = @bind_pairs[str]
       table_for(parent)[attr_name]
+    end
+
+    def chain_scope(scope, args)
+      return unless @klass.method(scope) && args != false
+      @object = if scope_arity(scope) < 1 && args == true
+                  @object.public_send(scope)
+                else
+                  @object.public_send(scope, *args)
+                end
+    end
+
+    def scope_arity(scope)
+      @klass.method(scope).arity
     end
 
     def bind(object, str)
@@ -136,6 +156,10 @@ module Ransack
       klass.ransackable_associations(auth_object).include? str
     end
 
+    def ransackable_scope?(str, klass)
+      klass.ransackable_scopes(auth_object).any? { |s| s.to_s == str }
+    end
+
     def searchable_attributes(str = '')
       traverse(str).ransackable_attributes(auth_object)
     end
@@ -147,6 +171,5 @@ module Ransack
     def searchable_associations(str = '')
       traverse(str).ransackable_associations(auth_object)
     end
-
   end
 end

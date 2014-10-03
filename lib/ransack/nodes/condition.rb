@@ -2,15 +2,15 @@ module Ransack
   module Nodes
     class Condition < Node
       i18n_word :attribute, :predicate, :combinator, :value
-      i18n_alias :a => :attribute, :p => :predicate, :m => :combinator,
-                 :v => :value
+      i18n_alias :a => :attribute, :p => :predicate,
+                 :m => :combinator, :v => :value
 
       attr_accessor :predicate
 
       class << self
         def extract(context, key, values)
           attributes, predicate = extract_attributes_and_predicate(key)
-          if attributes.size > 0
+          if attributes.size > 0 && predicate
             combinator = key.match(/_(or|and)_/) ? $1 : nil
             condition = self.new(context)
             condition.build(
@@ -20,10 +20,12 @@ module Ransack
               :v => predicate.wants_array ? Array(values) : [values]
             )
             # TODO: Figure out what to do with multiple types of attributes,
-            # if anything.
-            # Tempted to go with "garbage in, garbage out" on this one
-            predicate.validate(condition.values, condition.default_type) ?
-              condition : nil
+            # if anything. Tempted to go with "garbage in, garbage out" here.
+            if predicate.validate(condition.values, condition.default_type)
+              condition
+            else
+              nil
+            end
           end
         end
 
@@ -33,7 +35,9 @@ module Ransack
           str = key.dup
           name = Predicate.detect_and_strip_from_string!(str)
           predicate = Predicate.named(name)
-          raise ArgumentError, "No valid predicate for #{key}" unless predicate
+          unless predicate || Ransack.options[:ignore_unknown_conditions]
+            raise ArgumentError, "No valid predicate for #{key}"
+          end
           attributes = str.split(/_and_|_or_/)
           [attributes, predicate]
         end
@@ -169,8 +173,9 @@ module Ransack
       def arel_predicate
         predicates = attributes.map do |attr|
           attr.attr.send(
-            predicate.arel_predicate, formatted_values_for_attribute(attr)
-            )
+            arel_predicate_for_attribute(attr),
+            formatted_values_for_attribute(attr)
+          )
         end
 
         if predicates.size > 1
@@ -195,13 +200,25 @@ module Ransack
 
       def formatted_values_for_attribute(attr)
         formatted = casted_values_for_attribute(attr).map do |val|
-          val = attr.ransacker.formatter.call(val) if attr.ransacker &&
-            attr.ransacker.formatter
+          val = attr.ransacker.formatter.call(val) if
+            attr.ransacker && attr.ransacker.formatter
           val = predicate.format(val)
           val
         end
         predicate.wants_array ? formatted : formatted.first
       end
+
+      def arel_predicate_for_attribute(attr)
+        if predicate.arel_predicate === Proc
+          values = casted_values_for_attribute(attr)
+          predicate.arel_predicate.call(
+            predicate.wants_array ? values : values.first
+            )
+        else
+          predicate.arel_predicate
+        end
+      end
+
 
       def default_type
         predicate.type || (attributes.first && attributes.first.type)

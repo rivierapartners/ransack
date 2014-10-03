@@ -19,8 +19,9 @@ module Ransack
       end
 
       def valid?
-        bound? && attr && context.klassify(parent)
-        .ransackable_attributes(context.auth_object).include?(attr_name)
+        bound? && attr &&
+        context.klassify(parent).ransackable_attributes(context.auth_object)
+        .include?(attr_name)
       end
 
       def type

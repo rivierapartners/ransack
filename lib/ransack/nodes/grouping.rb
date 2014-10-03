@@ -23,7 +23,7 @@ module Ransack
       def translate(key, options = {})
         super or Translate.attribute(
           key.to_s, options.merge(:context => context)
-          )
+        )
       end
 
       def conditions
@@ -162,9 +162,9 @@ module Ransack
 
       def inspect
         data = [['conditions', conditions], ['combinator', combinator]]
-        .reject { |e| e[1].blank? }
-        .map { |v| "#{v[0]}: #{v[1]}" }
-        .join(', ')
+               .reject { |e| e[1].blank? }
+               .map { |v| "#{v[0]}: #{v[1]}" }
+               .join(', ')
         "Grouping <#{data}>"
       end
 
