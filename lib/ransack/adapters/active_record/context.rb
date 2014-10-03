@@ -24,10 +24,28 @@ module Ransack
           return nil unless attr && attr.valid?
           name    = attr.arel_attribute.name.to_s
           table   = attr.arel_attribute.relation.table_name
-
+          
           schema_cache = @engine.connection.schema_cache
-          raise "No table named #{table} exists" unless schema_cache.table_exists?(table)
-          schema_cache.columns_hash(table)[name].type
+          
+          unless schema_cache.table_exists?(table)
+            prefix = name[0,2]
+            case prefix
+            when 'bo'
+              :boolean
+            when 'in'
+              :integer
+            when 'fl'
+              :float
+            when 'da'
+              :datetime
+            when 'st'
+            	:string
+            else
+              :integer
+            end
+          else
+	          schema_cache.columns_hash(table)[name].type
+          end
         end
 
         def evaluate(search, opts = {})
